@@ -51,11 +51,12 @@ export const appConfig = {
   // AI Model Configuration
   ai: {
     // Default AI model
-    defaultModel: 'google/gemini-3-pro-preview',
+    defaultModel: 'openai/deepseek-v4-flash',
     
     // Available models
     availableModels: [
       'openai/gpt-5',
+      'openai/deepseek-v4-flash',
       'moonshotai/kimi-k2-instruct-0905',
       'anthropic/claude-sonnet-4-20250514',
       'google/gemini-3-pro-preview'
@@ -64,6 +65,7 @@ export const appConfig = {
     // Model display names
     modelDisplayNames: {
       'openai/gpt-5': 'GPT-5',
+      'openai/deepseek-v4-flash': 'DeepSeek V4 Flash',
       'moonshotai/kimi-k2-instruct-0905': 'Kimi K2 (Groq)',
       'anthropic/claude-sonnet-4-20250514': 'Sonnet 4',
       'google/gemini-3-pro-preview': 'Gemini 3 Pro (Preview)'
@@ -180,7 +182,19 @@ export const appConfig = {
     
     // Request timeout (milliseconds)
     requestTimeout: 30000,
-  }
+  },
+
+  // Multi-Page Configuration
+  multiPage: {
+    // Max concurrent scrape requests
+    maxConcurrency: 3,
+    // Default depth to auto-select (0=root, 1=top-level sections)
+    defaultSelectDepth: 1,
+    // Depths to select by default
+    defaultSelectedDepths: [0, 1],
+    // Max pages allowed (safety limit)
+    maxPages: 50,
+  },
 };
 
 // Type-safe config getter
