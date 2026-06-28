@@ -30,6 +30,23 @@ ${page.content || '(No content available — generate based on title)'}
 `;
     }).join('\n\n');
 
+    // Build image path section if images are available
+    let imageSection = '';
+    if (body.imagePaths) {
+      const entries = Object.entries(body.imagePaths);
+      if (entries.length > 0) {
+        const localPaths = entries.map(([, local]) => local);
+        imageSection = `
+
+AVAILABLE IMAGES (stored locally):
+${localPaths.map((p) => `- ${p}`).join('\n')}
+
+Use <img src="${localPaths[0].replace(/\/[^/]*$/, '/')}filename.jpg" /> to reference these images in your components.
+The images are already downloaded to the sandbox's /public/images/ directory.
+`;
+      }
+    }
+
     const modelName = body.model.replace('openai/', '');
 
     const systemPrompt = `You are generating a complete multi-page React single-page application using react-router-dom v6.
@@ -45,7 +62,7 @@ REQUIREMENTS:
 
 PAGES TO CREATE:
 ${pagesSection}
-
+${imageSection}
 FILE STRUCTURE:
 - src/App.jsx - Router config with all routes
 - src/main.jsx - Entry point

@@ -21,9 +21,11 @@ export interface MultiPageGenerationPage {
   title: string;
   content: string;
   screenshot: string | null;
+  images?: string[];
 }
 
 export interface MultiPageGenerationRequest {
   pages: MultiPageGenerationPage[];
   model: string;
+  imagePaths?: Record<string, string>;
 }
