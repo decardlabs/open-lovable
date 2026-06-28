@@ -21,4 +21,21 @@ test.describe('POST /api/batch-scrape', () => {
     });
     expect(response.status()).toBe(400);
   });
+
+  test('returns images from scraped content', async ({ request }) => {
+    const response = await request.post('http://localhost:3001/api/batch-scrape', {
+      data: { urls: ['https://example.com'] },
+    });
+    expect(response.ok()).toBeTruthy();
+    const body = await response.text();
+    // Check that page-done events contain an images field
+    const lines = body.split('\n').filter(l => l.startsWith('data:'));
+    for (const line of lines) {
+      const event = JSON.parse(line.slice(6));
+      if (event.type === 'page-done') {
+        expect(event).toHaveProperty('images');
+        expect(Array.isArray(event.images)).toBe(true);
+      }
+    }
+  });
 });

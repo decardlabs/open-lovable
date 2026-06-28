@@ -3,6 +3,22 @@ import type { BatchScrapeEvent } from '@/types/multi-page';
 
 export const dynamic = 'force-dynamic';
 
+function extractImages(markdown: string): string[] {
+  const urls: string[] = [];
+  // Markdown images: ![alt](url)
+  const mdRegex = /!\[.*?\]\((https?:\/\/[^\s)]+)\)/g;
+  let match;
+  while ((match = mdRegex.exec(markdown)) !== null) {
+    urls.push(match[1]);
+  }
+  // HTML img tags: <img src="url">
+  const htmlRegex = /<img[^>]+src=["'](https?:\/\/[^"']+)["']/gi;
+  while ((match = htmlRegex.exec(markdown)) !== null) {
+    urls.push(match[1]);
+  }
+  return [...new Set(urls)]; // Deduplicate
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { urls } = await request.json();
@@ -63,12 +79,14 @@ export async function POST(request: NextRequest) {
                 const data = await resp.json();
                 if (data.success && data.data) {
                   successfulPages++;
+                  const markdown = data.data.markdown || '';
                   sendEvent({
                     type: 'page-done',
                     url,
                     title: data.data.metadata?.title || url,
-                    content: data.data.markdown || '',
+                    content: markdown,
                     screenshot: data.data.screenshot || null,
+                    images: extractImages(markdown),
                   });
                 } else {
                   sendEvent({ type: 'page-error', url, error: data.error || 'Scrape failed' });

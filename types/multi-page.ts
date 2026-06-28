@@ -12,7 +12,7 @@ export interface BatchScrapeRequest {
 
 export type BatchScrapeEvent =
   | { type: 'page-start'; url: string; index: number; total: number }
-  | { type: 'page-done'; url: string; title: string; content: string; screenshot: string | null }
+  | { type: 'page-done'; url: string; title: string; content: string; screenshot: string | null; images: string[] }
   | { type: 'page-error'; url: string; error: string }
   | { type: 'complete'; totalPages: number; successfulPages: number };
 
