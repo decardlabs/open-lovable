@@ -636,12 +636,14 @@ function HomePage() {
                             </button>
                           )}
                           <PageSelector
+                            key={mappedPages.length > 0 ? 'loaded' : 'empty'}
                             pages={mappedPages}
                             onSelectionChange={setSelectedPages}
                             onStartClone={() => {
                               // Store selected page data for multi-page generation
                               sessionStorage.setItem('multiPageMode', 'true');
-                              sessionStorage.setItem('selectedPages', JSON.stringify(selectedPages));
+                              sessionStorage.setItem('multiPageSelected', JSON.stringify(selectedPages));
+                              sessionStorage.setItem('multiPageCount', String(selectedPages.length));
                               sessionStorage.setItem('targetUrl', url);
                               sessionStorage.setItem('selectedModel', selectedModel);
                               sessionStorage.setItem('autoStart', 'true');
