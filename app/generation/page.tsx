@@ -108,7 +108,10 @@ function AISandboxPage() {
   const [sandboxFiles, setSandboxFiles] = useState<Record<string, string>>({});
   const [hasInitialSubmission, setHasInitialSubmission] = useState<boolean>(false);
   const [fileStructure, setFileStructure] = useState<string>('');
-  
+  const [multiPageMode, setMultiPageMode] = useState(false);
+  const [multiPageCount, setMultiPageCount] = useState(0);
+  const [multiPageTitles, setMultiPageTitles] = useState<string[]>([]);
+
   const [conversationContext, setConversationContext] = useState<{
     scrapedWebsites: Array<{ url: string; content: any; timestamp: Date }>;
     generatedComponents: Array<{ name: string; path: string; content: string }>;
@@ -244,7 +247,34 @@ function AISandboxPage() {
         // Also set autoStart flag for the effect
         sessionStorage.setItem('autoStart', 'true');
       }
-      
+
+      // Check for multi-page clone mode
+      const storedMultiPageMode = sessionStorage.getItem('multiPageMode');
+      if (storedMultiPageMode === 'true') {
+        const storedMultiPageSelected = sessionStorage.getItem('multiPageSelected');
+        const storedMultiPageCount = sessionStorage.getItem('multiPageCount');
+        let count = 0;
+        let titles: string[] = [];
+
+        if (storedMultiPageCount) {
+          count = parseInt(storedMultiPageCount);
+        } else if (storedMultiPageSelected) {
+          try {
+            const selected = JSON.parse(storedMultiPageSelected);
+            count = selected.length;
+            titles = selected.map((p: any) => p.title || p.path || '');
+          } catch (e) {
+            console.error('[generation] Failed to parse multiPageSelected:', e);
+          }
+        }
+
+        if (count > 0) {
+          setMultiPageMode(true);
+          setMultiPageCount(count);
+          if (titles.length > 0) setMultiPageTitles(titles);
+        }
+      }
+
       // Clear old conversation
       try {
         await fetch('/api/conversation-state', {
@@ -3902,7 +3932,17 @@ Focus on the key sections and content, making it clean and modern.`;
                   {generationProgress.files.length} files generated
                 </div>
               )}
-              
+
+              {/* Multi-page clone indicator */}
+              {multiPageMode && multiPageCount > 0 && (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 border border-blue-200 rounded-md text-xs font-medium text-blue-700">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2zM4 21a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2z" />
+                  </svg>
+                  {multiPageCount} pages - Multi Page
+                </div>
+              )}
+
               {/* Live Code Generation Status */}
               {activeTab === 'generation' && generationProgress.isGenerating && (
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 border border-gray-200 rounded-md text-xs font-medium text-gray-700">
