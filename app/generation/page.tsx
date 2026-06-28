@@ -3515,7 +3515,8 @@ Focus on the key sections and content, making it clean and modern.`;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           pages: updatedPages,
-          model: aiModel
+          model: aiModel,
+          imagePaths: Object.fromEntries(allImages)
         })
       });
 
