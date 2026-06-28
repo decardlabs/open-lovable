@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { appConfig } from '@/config/app.config';
 import { toast } from "sonner";
@@ -20,7 +20,8 @@ import HomeHeroBadge from "@/components/app/(home)/sections/hero/Badge/Badge";
 import HomeHeroPixi from "@/components/app/(home)/sections/hero/Pixi/Pixi";
 import HomeHeroTitle from "@/components/app/(home)/sections/hero/Title/Title";
 import HeroInputSubmitButton from "@/components/app/(home)/sections/hero-input/Button/Button";
-// import Globe from "@/components/app/(home)/sections/hero-input/_svg/Globe";
+import PageSelector from "@/components/app/(home)/sections/hero-input/PageSelector";
+import type { MappedPage } from "@/types/multi-page";
 
 // Import header components
 import HeaderBrandKit from "@/components/shared/header/BrandKit/BrandKit";
@@ -37,7 +38,8 @@ interface SearchResult {
   markdown: string;
 }
 
-export default function HomePage() {
+function HomePage() {
+  const [mounted, setMounted] = useState(false);
   const [url, setUrl] = useState<string>("");
   const [selectedStyle, setSelectedStyle] = useState<string>("1");
   const [selectedModel, setSelectedModel] = useState<string>(appConfig.ai.defaultModel);
@@ -51,8 +53,20 @@ export default function HomePage() {
   const [showInstructionsForIndex, setShowInstructionsForIndex] = useState<number | null>(null);
   const [additionalInstructions, setAdditionalInstructions] = useState<string>('');
   const [extendBrandStyles, setExtendBrandStyles] = useState<boolean>(false);
+  const [multiPageMode, setMultiPageMode] = useState<boolean>(false);
+  const [mappedPages, setMappedPages] = useState<MappedPage[]>([]);
+  const [isMapLoading, setIsMapLoading] = useState<boolean>(false);
+  const [selectedPages, setSelectedPages] = useState<MappedPage[]>([]);
   const router = useRouter();
-  
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return <div className="min-h-screen bg-background-base" />;
+  }
+
   // Simple URL validation
   const validateUrl = (urlString: string) => {
     if (!urlString) return false;
@@ -96,11 +110,11 @@ export default function HomePage() {
       toast.error("Please describe what you want to build with this brand's styles");
       return;
     }
-    
+
     // If it's a search result being selected, fade out and redirect
     if (selectedResult) {
       setIsFadingOut(true);
-      
+
       // Wait for fade animation
       setTimeout(() => {
         sessionStorage.setItem('targetUrl', selectedResult.url);
@@ -114,7 +128,7 @@ export default function HomePage() {
       }, 500);
       return;
     }
-    
+
     // If it's a URL, check if we're extending brand styles or cloning
     if (isURL(inputValue)) {
       if (extendBrandStyles) {
@@ -137,18 +151,18 @@ export default function HomePage() {
       // It's a search term, fade out if results exist, then search
       if (hasSearched && searchResults.length > 0) {
         setIsFadingOut(true);
-        
+
         setTimeout(async () => {
           setSearchResults([]);
           setIsFadingOut(false);
           setShowSelectMessage(true);
-          
+
           // Perform new search
           await performSearch(inputValue);
           setHasSearched(true);
           setShowSearchTiles(true);
           setShowSelectMessage(false);
-          
+
           // Smooth scroll to carousel
           setTimeout(() => {
             const carouselSection = document.querySelector('.carousel-section');
@@ -163,7 +177,7 @@ export default function HomePage() {
         setIsSearching(true);
         setHasSearched(true);
         setShowSearchTiles(true);
-        
+
         // Scroll to carousel area immediately
         setTimeout(() => {
           const carouselSection = document.querySelector('.carousel-section');
@@ -171,11 +185,11 @@ export default function HomePage() {
             carouselSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }
         }, 100);
-        
+
         await performSearch(inputValue);
         setShowSelectMessage(false);
         setIsSearching(false);
-        
+
         // Smooth scroll to carousel
         setTimeout(() => {
           const carouselSection = document.querySelector('.carousel-section');
@@ -300,11 +314,11 @@ export default function HomePage() {
                   {hasSearched && searchResults.length > 0 && !isFadingOut ? (
                     <>
                       {/* Selection mode icon */}
-                      <svg 
-                        width="20" 
-                        height="20" 
-                        viewBox="0 0 20 20" 
-                        fill="none" 
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 20 20"
+                        fill="none"
                         xmlns="http://www.w3.org/2000/svg"
                         className="opacity-40 flex-shrink-0"
                       >
@@ -313,12 +327,12 @@ export default function HomePage() {
                         <rect x="2" y="11" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
                         <rect x="11" y="11" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
                       </svg>
-                      
+
                       {/* Selection message */}
                       <div className="flex-1 text-body-input text-accent-black">
                         Select which site to clone from the results below
                       </div>
-                      
+
                       {/* Search again button */}
                       <button
                         onClick={(e) => {
@@ -334,11 +348,11 @@ export default function HomePage() {
                         }}
                         className="button relative rounded-10 px-12 py-8 text-label-medium font-medium flex items-center justify-center gap-6 bg-gray-100 hover:bg-gray-200 text-gray-700 active:scale-[0.995] transition-all"
                       >
-                        <svg 
-                          width="16" 
-                          height="16" 
-                          viewBox="0 0 16 16" 
-                          fill="none" 
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 16 16"
+                          fill="none"
                           xmlns="http://www.w3.org/2000/svg"
                           className="opacity-60"
                         >
@@ -351,11 +365,11 @@ export default function HomePage() {
                     <>
                       {isURL(url) ? (
                         // Scrape icon for URLs
-                        <svg 
-                          width="20" 
-                          height="20" 
-                          viewBox="0 0 20 20" 
-                          fill="none" 
+                        <svg
+                          width="20"
+                          height="20"
+                          viewBox="0 0 20 20"
+                          fill="none"
                           xmlns="http://www.w3.org/2000/svg"
                           className="opacity-40 flex-shrink-0"
                         >
@@ -364,11 +378,11 @@ export default function HomePage() {
                         </svg>
                       ) : (
                         // Search icon for search terms
-                        <svg 
-                          width="20" 
-                          height="20" 
-                          viewBox="0 0 20 20" 
-                          fill="none" 
+                        <svg
+                          width="20"
+                          height="20"
+                          viewBox="0 0 20 20"
+                          fill="none"
                           xmlns="http://www.w3.org/2000/svg"
                           className="opacity-40 flex-shrink-0"
                         >
@@ -414,9 +428,9 @@ export default function HomePage() {
                         }}
                         className={isSearching ? 'pointer-events-none' : ''}
                       >
-                        <HeroInputSubmitButton 
-                          dirty={url.length > 0} 
-                          buttonText={isURL(url) ? 'Scrape Site' : 'Search'} 
+                        <HeroInputSubmitButton
+                          dirty={url.length > 0}
+                          buttonText={isURL(url) ? 'Scrape Site' : 'Search'}
                           disabled={isSearching}
                         />
                       </div>
@@ -474,6 +488,43 @@ export default function HomePage() {
                         </div>
                       </div>
 
+                      {/* Multi-Page Mode Toggle */}
+                      <div className={`transition-all duration-300 transform ${
+                        isValidUrl ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'
+                      }`} style={{ transitionDelay: '75ms' }}>
+                        <div className="py-8 flex items-center justify-between">
+                          <div className="text-xs font-medium text-black-alpha-72">
+                            Clone mode
+                          </div>
+                          <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
+                            <button
+                              onClick={() => {
+                                setMultiPageMode(false);
+                                setMappedPages([]);
+                                setSelectedPages([]);
+                              }}
+                              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                                !multiPageMode
+                                  ? 'bg-white text-gray-800 shadow-sm'
+                                  : 'text-gray-500 hover:text-gray-700'
+                              }`}
+                            >
+                              Single Page
+                            </button>
+                            <button
+                              onClick={() => setMultiPageMode(true)}
+                              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                                multiPageMode
+                                  ? 'bg-white text-gray-800 shadow-sm'
+                                  : 'text-gray-500 hover:text-gray-700'
+                              }`}
+                            >
+                              Multi Page
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
                       {/* Brand Extension Prompt - Show when toggle is enabled */}
                       {extendBrandStyles && (
                         <div className="pb-10 transition-all duration-300 opacity-100">
@@ -486,8 +537,8 @@ export default function HomePage() {
                         </div>
                       )}
 
-                      {/* Style Selector - Hide when brand extension mode is enabled */}
-                      {!extendBrandStyles && (
+                      {/* Style Selector - Hide when brand extension mode or multi-page mode is enabled */}
+                      {!extendBrandStyles && !multiPageMode && (
                         <div className={`mb-2 transition-all duration-300 transform ${
                           isValidUrl ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'
                         }`} style={{ transitionDelay: '100ms' }}>
@@ -522,6 +573,7 @@ export default function HomePage() {
                       )}
 
                       {/* Model Selector Dropdown and Additional Instructions */}
+                      {!multiPageMode && (
                       <div className={`flex items-center gap-3 mt-2 pb-4 transition-all duration-300 transform ${
                         isValidUrl ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'
                       }`} style={{ transitionDelay: '400ms' }}>
@@ -548,6 +600,57 @@ export default function HomePage() {
                           />
                         )}
                       </div>
+                      )}
+
+                      {/* Multi-Page Content: Discover Button and Page Selector */}
+                      {multiPageMode && (
+                        <div className="pb-4 transition-all duration-300 opacity-100">
+                          {mappedPages.length === 0 && !isMapLoading && (
+                            <button
+                              onClick={async () => {
+                                setIsMapLoading(true);
+                                try {
+                                  const res = await fetch('/api/website-map', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ url }),
+                                  });
+                                  const data = await res.json();
+                                  if (data.success && data.pages) {
+                                    setMappedPages(data.pages);
+                                    // Auto-select root + depth 1
+                                    const autoSelected = data.pages.filter(
+                                      (p: MappedPage) => p.depth <= 1
+                                    );
+                                    setSelectedPages(autoSelected);
+                                  }
+                                } catch (error) {
+                                  console.error('Map discovery error:', error);
+                                } finally {
+                                  setIsMapLoading(false);
+                                }
+                              }}
+                              className="w-full py-2.5 px-4 rounded-lg text-sm font-medium bg-heat-100 hover:bg-heat-200 text-white transition-all"
+                            >
+                              Discover Pages
+                            </button>
+                          )}
+                          <PageSelector
+                            pages={mappedPages}
+                            onSelectionChange={setSelectedPages}
+                            onStartClone={() => {
+                              // Store selected page data for multi-page generation
+                              sessionStorage.setItem('multiPageMode', 'true');
+                              sessionStorage.setItem('selectedPages', JSON.stringify(selectedPages));
+                              sessionStorage.setItem('targetUrl', url);
+                              sessionStorage.setItem('selectedModel', selectedModel);
+                              sessionStorage.setItem('autoStart', 'true');
+                              router.push('/generation');
+                            }}
+                            isMapLoading={isMapLoading}
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -568,14 +671,14 @@ export default function HomePage() {
             isFadingOut ? 'opacity-0' : 'opacity-100'
           }`}>
             <div className="absolute inset-0 bg-gradient-to-b from-gray-50/50 to-white rounded-[50%] transform scale-x-150 -translate-y-24" />
-            
+
             {isSearching ? (
               // Loading state with animated scrolling skeletons
               <div className="relative h-[250px] overflow-hidden">
                 {/* Edge fade overlays */}
                 <div className="absolute left-0 top-0 bottom-0 w-[120px] z-20 pointer-events-none" style={{background: 'linear-gradient(to right, white 0%, white 20%, transparent 100%)'}} />
                 <div className="absolute right-0 top-0 bottom-0 w-[120px] z-20 pointer-events-none" style={{background: 'linear-gradient(to left, white 0%, white 20%, transparent 100%)'}} />
-                
+
                 <div className="carousel-container absolute left-0 flex gap-12 py-4">
                   {/* Duplicate skeleton tiles for continuous scroll */}
                   {[...Array(10), ...Array(10)].map((_, index) => (
@@ -586,7 +689,7 @@ export default function HomePage() {
                       <div className="absolute inset-0 skeleton-shimmer">
                         <div className="absolute inset-0 bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 skeleton-gradient" />
                       </div>
-                      
+
                       {/* Fake browser UI - 5x bigger */}
                       <div className="absolute top-0 left-0 right-0 h-40 bg-gray-100 border-b border-gray-200/50 flex items-center px-6 gap-4">
                         <div className="flex gap-3">
@@ -596,7 +699,7 @@ export default function HomePage() {
                         </div>
                         <div className="flex-1 h-8 bg-gray-200 rounded-md mx-6 animate-pulse" />
                       </div>
-                      
+
                       {/* Content skeleton - positioned just below nav bar */}
                       <div className="absolute top-44 left-4 right-4">
                         <div className="h-3 bg-gray-200 rounded w-3/4 mb-2 animate-pulse" />
@@ -613,7 +716,7 @@ export default function HomePage() {
                 {/* Edge fade overlays */}
                 <div className="absolute left-0 top-0 bottom-0 w-[120px] z-20 pointer-events-none" style={{background: 'linear-gradient(to right, white 0%, white 20%, transparent 100%)'}} />
                 <div className="absolute right-0 top-0 bottom-0 w-[120px] z-20 pointer-events-none" style={{background: 'linear-gradient(to left, white 0%, white 20%, transparent 100%)'}} />
-                
+
                 <div className="carousel-container absolute left-0 flex gap-12 py-4">
                   {/* Duplicate results for infinite scroll */}
                   {[...searchResults, ...searchResults].map((result, index) => (
@@ -639,18 +742,18 @@ export default function HomePage() {
                               <div className="p-16 flex gap-12 items-start w-full relative">
                                 {/* Instructions icon */}
                                 <div className="mt-2 flex-shrink-0">
-                                  <svg 
-                                    width="20" 
-                                    height="20" 
-                                    viewBox="0 0 20 20" 
-                                    fill="none" 
+                                  <svg
+                                    width="20"
+                                    height="20"
+                                    viewBox="0 0 20 20"
+                                    fill="none"
                                     xmlns="http://www.w3.org/2000/svg"
                                     className="opacity-40"
                                   >
                                     <path d="M5 5H15M5 10H15M5 15H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                                   </svg>
                                 </div>
-                                
+
                                 <textarea
                                   value={additionalInstructions}
                                   onChange={(e) => setAdditionalInstructions(e.target.value)}
@@ -667,10 +770,10 @@ export default function HomePage() {
                                   }}
                                 />
                               </div>
-                              
+
                               {/* Divider */}
                               <div className="border-t border-black-alpha-5" />
-                              
+
                               {/* Buttons area matching main style */}
                               <div className="p-10 flex justify-between items-center">
                                 <button
@@ -681,17 +784,17 @@ export default function HomePage() {
                                   }}
                                   className="button relative rounded-10 px-8 py-8 text-label-medium font-medium flex items-center justify-center bg-black-alpha-4 hover:bg-black-alpha-6 text-black-alpha-48 active:scale-[0.995] transition-all"
                                 >
-                                  <svg 
-                                    width="20" 
-                                    height="20" 
-                                    viewBox="0 0 20 20" 
-                                    fill="none" 
+                                  <svg
+                                    width="20"
+                                    height="20"
+                                    viewBox="0 0 20 20"
+                                    fill="none"
                                     xmlns="http://www.w3.org/2000/svg"
                                   >
                                     <path d="M12 5L7 10L12 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                                   </svg>
                                 </button>
-                                
+
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -704,19 +807,19 @@ export default function HomePage() {
                                   className={`
                                     button relative rounded-10 px-8 py-8 text-label-medium font-medium
                                     flex items-center justify-center gap-6
-                                    ${additionalInstructions.trim() 
-                                      ? 'button-primary text-accent-white active:scale-[0.995]' 
+                                    ${additionalInstructions.trim()
+                                      ? 'button-primary text-accent-white active:scale-[0.995]'
                                       : 'bg-black-alpha-4 text-black-alpha-24 cursor-not-allowed'
                                     }
                                   `}
                                 >
                                   {additionalInstructions.trim() && <div className="button-background absolute inset-0 rounded-10 pointer-events-none" />}
                                   <span className="px-6 relative">Apply & Clone</span>
-                                  <svg 
-                                    width="20" 
-                                    height="20" 
-                                    viewBox="0 0 20 20" 
-                                    fill="none" 
+                                  <svg
+                                    width="20"
+                                    height="20"
+                                    viewBox="0 0 20 20"
+                                    fill="none"
                                     xmlns="http://www.w3.org/2000/svg"
                                     className="relative"
                                   >
@@ -733,7 +836,7 @@ export default function HomePage() {
                               <p className="text-base font-semibold mb-0.5">{result.title}</p>
                               <p className="text-[11px] opacity-80">Choose how to clone this site</p>
                             </div>
-                            
+
                             <div className="flex gap-3 justify-center">
                               {/* Instant Clone Button - Orange/Heat style */}
                               <button
@@ -744,11 +847,11 @@ export default function HomePage() {
                                 className="bg-orange-500 hover:bg-orange-600 flex items-center justify-center button relative text-label-medium button-primary group/button rounded-10 p-8 gap-2 text-white active:scale-[0.995]"
                               >
                                 <div className="button-background absolute inset-0 rounded-10 pointer-events-none" />
-                                <svg 
-                                  width="20" 
-                                  height="20" 
-                                  viewBox="0 0 20 20" 
-                                  fill="none" 
+                                <svg
+                                  width="20"
+                                  height="20"
+                                  viewBox="0 0 20 20"
+                                  fill="none"
                                   xmlns="http://www.w3.org/2000/svg"
                                   className="relative"
                                 >
@@ -756,7 +859,7 @@ export default function HomePage() {
                                 </svg>
                                 <span className="px-6 relative">Instant Clone</span>
                               </button>
-                              
+
                               {/* Instructions Button - Gray style */}
                               <button
                                 onClick={(e) => {
@@ -766,11 +869,11 @@ export default function HomePage() {
                                 }}
                                 className="bg-gray-100 hover:bg-gray-200 flex items-center justify-center button relative text-label-medium rounded-10 p-8 gap-2 text-gray-700 active:scale-[0.995]"
                               >
-                                <svg 
-                                  width="20" 
-                                  height="20" 
-                                  viewBox="0 0 20 20" 
-                                  fill="none" 
+                                <svg
+                                  width="20"
+                                  height="20"
+                                  viewBox="0 0 20 20"
+                                  fill="none"
                                   xmlns="http://www.w3.org/2000/svg"
                                   className="opacity-60"
                                 >
@@ -783,11 +886,11 @@ export default function HomePage() {
                           </>
                         )}
                       </div>
-                      
+
                       {result.screenshot ? (
                         <div className="relative w-full h-full">
-                          <Image 
-                            src={result.screenshot} 
+                          <Image
+                            src={result.screenshot}
                             alt={result.title}
                             fill
                             className="object-cover object-top"
@@ -798,11 +901,11 @@ export default function HomePage() {
                         <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center">
                           <div className="text-center">
                             <div className="w-16 h-16 rounded-full bg-gray-200 mx-auto mb-3 flex items-center justify-center">
-                              <svg 
-                                width="32" 
-                                height="32" 
-                                viewBox="0 0 24 24" 
-                                fill="none" 
+                              <svg
+                                width="32"
+                                height="32"
+                                viewBox="0 0 24 24"
+                                fill="none"
                                 xmlns="http://www.w3.org/2000/svg"
                                 className="text-gray-400"
                               >
@@ -889,4 +992,8 @@ export default function HomePage() {
       `}</style>
     </HeaderProvider>
   );
+}
+
+export default function Page() {
+  return <HomePage />;
 }
