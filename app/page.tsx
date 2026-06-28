@@ -300,7 +300,7 @@ function HomePage() {
             <Connector className="-bottom-10 -right-[10.5px] lg:hidden" />
 
             {/* Hero Input Component */}
-            <div className="max-w-552 mx-auto z-[11] lg:z-[2]">
+            <div className="w-2/3 max-w-[900px] mx-auto z-[11] lg:z-[2]">
               <div className="rounded-20 -mt-30 lg:-mt-30">
                 <div
                   className="bg-white rounded-20 relative z-10"

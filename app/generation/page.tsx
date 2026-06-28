@@ -162,16 +162,21 @@ function AISandboxPage() {
 
   // Store flag to trigger generation after component mounts
   const [shouldAutoGenerate, setShouldAutoGenerate] = useState(false);
+  const initializedRef = useRef(false);
 
   // Clear old conversation data on component mount and create/restore sandbox
   useEffect(() => {
+    // Prevent double execution in React StrictMode (dev mode mounts twice)
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+
     let isMounted = true;
     let sandboxCreated = false; // Track if sandbox was created in this effect
 
     const initializePage = async () => {
       // Prevent double execution in React StrictMode
       if (sandboxCreated) return;
-      
+
       // First check URL parameters (from home page navigation)
       const urlParam = searchParams.get('url');
       const templateParam = searchParams.get('template');
