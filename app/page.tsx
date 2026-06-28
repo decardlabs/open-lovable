@@ -57,6 +57,7 @@ function HomePage() {
   const [mappedPages, setMappedPages] = useState<MappedPage[]>([]);
   const [isMapLoading, setIsMapLoading] = useState<boolean>(false);
   const [selectedPages, setSelectedPages] = useState<MappedPage[]>([]);
+  const [useOriginalImageUrls, setUseOriginalImageUrls] = useState<boolean>(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -647,9 +648,12 @@ function HomePage() {
                               sessionStorage.setItem('targetUrl', url);
                               sessionStorage.setItem('selectedModel', selectedModel);
                               sessionStorage.setItem('autoStart', 'true');
+                              sessionStorage.setItem('useOriginalUrls', JSON.stringify(useOriginalImageUrls));
                               router.push('/generation');
                             }}
                             isMapLoading={isMapLoading}
+                            useOriginalUrls={useOriginalImageUrls}
+                            onImageSourceChange={setUseOriginalImageUrls}
                           />
                         </div>
                       )}

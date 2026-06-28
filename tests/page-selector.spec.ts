@@ -58,4 +58,33 @@ test.describe('Page Selector UI', () => {
     await expect(page.locator('text=About').first()).toBeVisible();
     await expect(page.locator('text=Products').first()).toBeVisible();
   });
+
+  test('shows image source toggle when pages are loaded', async ({ page }) => {
+    await page.route('**/api/website-map', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          url: 'https://example.com',
+          pages: [
+            { path: '/', title: '首页', depth: 0 },
+            { path: '/about', title: 'About', depth: 1 },
+          ],
+        }),
+      });
+    });
+
+    const input = page.locator('input[placeholder*="Enter URL"]');
+    await input.fill('https://example.com');
+    await page.locator('text=Multi Page').first().click();
+    await page.locator('button:has-text("Discover Pages")').first().click();
+    await page.waitForTimeout(2000);
+
+    // Image source toggle should be visible
+    await expect(page.locator('text=图片来源').first()).toBeVisible({ timeout: 5000 });
+    // Both options should be visible
+    await expect(page.locator('text=Use original URLs').first()).toBeVisible();
+    await expect(page.locator('text=Download to local').first()).toBeVisible();
+  });
 });

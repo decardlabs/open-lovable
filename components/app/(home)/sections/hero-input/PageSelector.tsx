@@ -8,6 +8,8 @@ interface PageSelectorProps {
   onSelectionChange: (selected: MappedPage[]) => void;
   onStartClone: () => void;
   isMapLoading?: boolean;
+  useOriginalUrls?: boolean;
+  onImageSourceChange?: (useOriginal: boolean) => void;
 }
 
 export default function PageSelector({
@@ -15,6 +17,8 @@ export default function PageSelector({
   onSelectionChange,
   onStartClone,
   isMapLoading = false,
+  useOriginalUrls = false,
+  onImageSourceChange,
 }: PageSelectorProps) {
   // Default: select root + depth 1
   const defaultSelected = new Set(
@@ -101,7 +105,33 @@ export default function PageSelector({
           {selectAll ? '取消全选' : '全选'}
         </button>
       </div>
-      <div className="max-h-48 overflow-y-auto border border-gray-100 rounded-lg">
+      {/* Image source toggle */}
+      <div className="flex items-center justify-between px-2 py-1.5 border-t border-gray-50 mt-1 pt-2">
+        <span className="text-xs font-medium text-gray-600">图片来源:</span>
+        <div className="flex gap-1 bg-gray-50 rounded-md p-0.5">
+          <button
+            onClick={() => onImageSourceChange?.(true)}
+            className={`px-2 py-1 text-[11px] font-medium rounded transition-all ${
+              useOriginalUrls
+                ? 'bg-white text-gray-800 shadow-sm border border-gray-200'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Use original URLs
+          </button>
+          <button
+            onClick={() => onImageSourceChange?.(false)}
+            className={`px-2 py-1 text-[11px] font-medium rounded transition-all ${
+              !useOriginalUrls
+                ? 'bg-white text-gray-800 shadow-sm border border-gray-200'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Download to local
+          </button>
+        </div>
+      </div>
+      <div className="overflow-y-auto border border-gray-100 rounded-lg" style={{maxHeight: '280px'}}>
         {sortedPages.map(renderPage)}
       </div>
       <button
