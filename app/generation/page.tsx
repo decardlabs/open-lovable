@@ -3332,6 +3332,9 @@ Focus on the key sections and content, making it clean and modern.`;
   const startMultiPageGeneration = async (targetUrl: string, pages: Array<{path: string; title: string; depth: number}>) => {
     if (!targetUrl || !pages || pages.length === 0) return;
 
+    const useOriginalUrls = sessionStorage.getItem('useOriginalUrls') === 'true';
+    sessionStorage.removeItem('useOriginalUrls');
+
     setHomeScreenFading(false);
     setShowHomeScreen(false);
     setIsStartingNewGeneration(true);
@@ -3450,56 +3453,72 @@ Focus on the key sections and content, making it clean and modern.`;
 
       addChatMessage(`Successfully scraped ${scrapedPages.length} pages for multi-page clone`, 'system');
 
-      // === STEP 1.5: Download extracted images to sandbox ===
-      const allImages = new Map<string, string>(); // original URL -> local filename
-      let imageIndex = 0;
-      for (const pageData of scrapedPages) {
-        if (pageData.images) {
-          for (const imgUrl of pageData.images) {
-            if (!allImages.has(imgUrl)) {
-              const ext = imgUrl.split('.').pop()?.split('?')[0] || 'jpg';
-              const filename = `img_${imageIndex++}.${ext}`;
-              allImages.set(imgUrl, filename);
+      // === STEP 1.5: Download extracted images or keep original URLs ===
+      let allImages: Map<string, string>;
+      let updatedPages: Array<{ url: string; title: string; content: string; screenshot: string | null }>;
+
+      if (!useOriginalUrls) {
+        // Download images to /public/images/ and use local paths
+        allImages = new Map<string, string>(); // original URL -> local filename
+        let imageIndex = 0;
+        for (const pageData of scrapedPages) {
+          if (pageData.images) {
+            for (const imgUrl of pageData.images) {
+              if (!allImages.has(imgUrl)) {
+                const ext = imgUrl.split('.').pop()?.split('?')[0] || 'jpg';
+                const filename = `img_${imageIndex++}.${ext}`;
+                allImages.set(imgUrl, filename);
+              }
             }
           }
         }
-      }
 
-      if (allImages.size > 0) {
-        addChatMessage(`Downloading ${allImages.size} images...`, 'system');
-        let downloadedCount = 0;
-        for (const [imgUrl, filename] of allImages) {
-          try {
-            const cmdResp = await fetch('/api/run-command-v2', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                command: `mkdir -p public/images && curl -s -o public/images/${filename} "${imgUrl}"`
-              }),
-            });
-            if (cmdResp.ok) {
-              downloadedCount++;
-              setUrlStatus([`Downloaded ${downloadedCount}/${allImages.size} images...`]);
+        if (allImages.size > 0) {
+          addChatMessage(`Downloading ${allImages.size} images...`, 'system');
+          let downloadedCount = 0;
+          for (const [imgUrl, filename] of allImages) {
+            try {
+              const cmdResp = await fetch('/api/run-command-v2', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  command: `mkdir -p public/images && curl -s -o public/images/${filename} "${imgUrl}"`
+                }),
+              });
+              if (cmdResp.ok) {
+                downloadedCount++;
+                setUrlStatus([`Downloaded ${downloadedCount}/${allImages.size} images...`]);
+              }
+            } catch (e) {
+              console.error(`[multi-page] Failed to download image: ${imgUrl}`, e);
             }
-          } catch (e) {
-            console.error(`[multi-page] Failed to download image: ${imgUrl}`, e);
           }
         }
-      }
 
-      // Replace original image URLs in page content with local paths
-      const updatedPages = scrapedPages.map(pageData => {
-        let updatedContent = pageData.content || '';
-        for (const [imgUrl, filename] of allImages) {
-          updatedContent = updatedContent.replaceAll(imgUrl, `/images/${filename}`);
-        }
-        return {
+        // Replace original image URLs in page content with local paths
+        updatedPages = scrapedPages.map(pageData => {
+          let updatedContent = pageData.content || '';
+          for (const [imgUrl, filename] of allImages) {
+            updatedContent = updatedContent.replaceAll(imgUrl, `/images/${filename}`);
+          }
+          return {
+            url: pageData.url,
+            title: pageData.title,
+            content: updatedContent,
+            screenshot: pageData.screenshot || null,
+          };
+        });
+      } else {
+        // Keep original image URLs - pass scraped pages as-is
+        addChatMessage('Using original image URLs from source website', 'system');
+        allImages = new Map<string, string>();
+        updatedPages = scrapedPages.map(pageData => ({
           url: pageData.url,
           title: pageData.title,
-          content: updatedContent,
+          content: pageData.content || '',
           screenshot: pageData.screenshot || null,
-        };
-      });
+        }));
+      }
 
       // === STEP 2: Generate multi-page code ===
       setLoadingStage('generating');
@@ -3516,7 +3535,7 @@ Focus on the key sections and content, making it clean and modern.`;
         body: JSON.stringify({
           pages: updatedPages,
           model: aiModel,
-          imagePaths: Object.fromEntries(allImages)
+          imagePaths: useOriginalUrls ? {} : Object.fromEntries(allImages)
         })
       });
 

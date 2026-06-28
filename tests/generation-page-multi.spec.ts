@@ -116,4 +116,94 @@ test.describe('Generation Page - Multi-Page Mode', () => {
     expect(sentPages.length).toBeGreaterThanOrEqual(1);
     expect(sentPages[0].content.includes('/images/')).toBeTruthy();
   });
+
+  test('skips image download when useOriginalUrls is true', async ({ page }) => {
+    // Set sessionStorage BEFORE navigation so the React component can read it on mount
+    await page.addInitScript(() => {
+      sessionStorage.setItem('multiPageMode', 'true');
+      sessionStorage.setItem('useOriginalUrls', 'true');
+      sessionStorage.setItem('multiPageSelected', JSON.stringify([
+        { path: '/', title: 'Home' },
+      ]));
+      sessionStorage.setItem('multiPageCount', '1');
+      sessionStorage.setItem('targetUrl', 'https://example.com');
+    });
+
+    let curlCommandIssued = false;
+    let sentPages: any[] = [];
+
+    await page.route('**/api/run-command-v2', async (route) => {
+      const body = JSON.parse(route.request().postData() || '{}');
+      if (body.command && body.command.includes('curl')) {
+        curlCommandIssued = true;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true }),
+      });
+    });
+
+    // Intercept batch-scrape to return pages with images
+    await page.route('**/api/batch-scrape', async (route) => {
+      const response = new Response(
+        `data: {"type":"page-start","url":"https://example.com","index":0,"total":1}\n\n` +
+        `data: {"type":"page-done","url":"https://example.com","title":"Home","content":"Hello ![](https://example.com/image.jpg)","screenshot":null,"images":["https://example.com/image.jpg"]}\n\n` +
+        `data: {"type":"complete","totalPages":1,"successfulPages":1}\n\n`,
+        {
+          headers: { 'Content-Type': 'text/event-stream' },
+        }
+      );
+      await route.fulfill({ status: 200, body: await response.text(), contentType: 'text/event-stream' });
+    });
+
+    // Intercept generate-multi-page and return success
+    await page.route('**/api/generate-multi-page', async (route) => {
+      const body = JSON.parse(route.request().postData() || '{}');
+      sentPages = body.pages || [];
+      const response = new Response(
+        `data: {"type":"stream","text":"console.log(\\"test\\");"}\n\n` +
+        `data: {"type":"complete"}\n\n`,
+        {
+          headers: { 'Content-Type': 'text/event-stream' },
+        }
+      );
+      await route.fulfill({ status: 200, body: await response.text(), contentType: 'text/event-stream' });
+    });
+
+    // Intercept sandbox creation
+    await page.route('**/api/create-ai-sandbox-v2', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          sandboxId: 'test-sandbox',
+          url: 'https://test-sandbox.example.com',
+          success: true,
+          structure: { files: [] },
+        }),
+      });
+    });
+
+    // Intercept sandbox files
+    await page.route('**/api/get-sandbox-files', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ files: {} }),
+      });
+    });
+
+    // Navigate - sessionStorage is already set via addInitScript
+    await page.goto('/generation');
+    await page.waitForTimeout(10000);
+
+    // Should NOT have issued curl commands for images
+    expect(curlCommandIssued).toBe(false);
+
+    // Verify that the content sent to generate-multi-page keeps original URLs
+    expect(sentPages.length).toBeGreaterThanOrEqual(1);
+    expect(sentPages[0].content.includes('https://example.com/image.jpg')).toBeTruthy();
+    expect(sentPages[0].content.includes('/images/')).toBeFalsy();
+  });
 });
