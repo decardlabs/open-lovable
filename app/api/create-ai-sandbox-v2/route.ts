@@ -49,6 +49,7 @@ export async function POST() {
     
     // Also store in legacy global state for backward compatibility
     global.activeSandboxProvider = provider;
+    global.activeSandbox = provider; // For legacy API routes like get-sandbox-files
     global.sandboxData = {
       sandboxId: sandboxInfo.sandboxId,
       url: sandboxInfo.url

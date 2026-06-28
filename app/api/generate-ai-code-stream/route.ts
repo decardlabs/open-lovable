@@ -15,33 +15,44 @@ import { appConfig } from '@/config/app.config';
 export const dynamic = 'force-dynamic';
 
 // Check if we're using Vercel AI Gateway
-const isUsingAIGateway = !!process.env.AI_GATEWAY_API_KEY;
+// Note: Only use AI Gateway if key is explicitly a non-empty string
+const aiGatewayApiKey = process.env.AI_GATEWAY_API_KEY;
+const isUsingAIGateway = typeof aiGatewayApiKey === 'string' && aiGatewayApiKey.length > 0;
 const aiGatewayBaseURL = 'https://ai-gateway.vercel.sh/v1';
 
 console.log('[generate-ai-code-stream] AI Gateway config:', {
   isUsingAIGateway,
-  hasGroqKey: !!process.env.GROQ_API_KEY,
-  hasAIGatewayKey: !!process.env.AI_GATEWAY_API_KEY
+  hasAIGatewayKey: isUsingAIGateway,
+  hasOpenAIKey: !!process.env.OPENAI_API_KEY,
+  openaiBaseUrl: process.env.OPENAI_BASE_URL
 });
 
+// Ensure we use the correct API key and base URL for each provider
+const effectiveOpenAIKey = isUsingAIGateway ? aiGatewayApiKey : process.env.OPENAI_API_KEY;
+const effectiveOpenAIBaseURL = isUsingAIGateway ? aiGatewayBaseURL : process.env.OPENAI_BASE_URL;
+const effectiveGroqKey = isUsingAIGateway ? aiGatewayApiKey : process.env.GROQ_API_KEY;
+const effectiveAnthropicKey = isUsingAIGateway ? aiGatewayApiKey : process.env.ANTHROPIC_API_KEY;
+const effectiveAnthropicBaseURL = isUsingAIGateway ? aiGatewayBaseURL : (process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com/v1');
+const effectiveGoogleKey = isUsingAIGateway ? aiGatewayApiKey : process.env.GEMINI_API_KEY;
+
 const groq = createGroq({
-  apiKey: process.env.AI_GATEWAY_API_KEY ?? process.env.GROQ_API_KEY,
-  baseURL: isUsingAIGateway ? aiGatewayBaseURL : undefined,
+  apiKey: effectiveGroqKey,
+  baseURL: undefined, // Let SDK use default
 });
 
 const anthropic = createAnthropic({
-  apiKey: process.env.AI_GATEWAY_API_KEY ?? process.env.ANTHROPIC_API_KEY,
-  baseURL: isUsingAIGateway ? aiGatewayBaseURL : (process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com/v1'),
+  apiKey: effectiveAnthropicKey,
+  baseURL: effectiveAnthropicBaseURL,
 });
 
 const googleGenerativeAI = createGoogleGenerativeAI({
-  apiKey: process.env.AI_GATEWAY_API_KEY ?? process.env.GEMINI_API_KEY,
-  baseURL: isUsingAIGateway ? aiGatewayBaseURL : undefined,
+  apiKey: effectiveGoogleKey,
+  baseURL: undefined, // Let SDK use default
 });
 
 const openai = createOpenAI({
-  apiKey: process.env.AI_GATEWAY_API_KEY ?? process.env.OPENAI_API_KEY,
-  baseURL: isUsingAIGateway ? aiGatewayBaseURL : process.env.OPENAI_BASE_URL,
+  apiKey: effectiveOpenAIKey,
+  baseURL: effectiveOpenAIBaseURL || undefined,
 });
 
 // Helper function to analyze user preferences from conversation history
@@ -1217,9 +1228,9 @@ MORPH FAST APPLY MODE (EDIT-ONLY):
         const isGoogle = model.startsWith('google/');
         const isOpenAI = model.startsWith('openai/');
         const isKimiGroq = model === 'moonshotai/kimi-k2-instruct-0905';
-        const modelProvider = isAnthropic ? anthropic : 
-                              (isOpenAI ? openai : 
-                              (isGoogle ? googleGenerativeAI : 
+        const modelProvider = isAnthropic ? anthropic :
+                              (isOpenAI ? openai.chat :
+                              (isGoogle ? googleGenerativeAI :
                               (isKimiGroq ? groq : groq)));
         
         // Fix model name transformation for different providers
@@ -1728,7 +1739,7 @@ Provide the complete file content without any truncation. Include all necessary 
                 // Create a new client for the completion based on the provider
                 let completionClient;
                 if (model.includes('gpt') || model.includes('openai')) {
-                  completionClient = openai;
+                  completionClient = openai.chat;
                 } else if (model.includes('claude')) {
                   completionClient = anthropic;
                 } else if (model === 'moonshotai/kimi-k2-instruct-0905') {
