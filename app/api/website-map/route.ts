@@ -44,30 +44,27 @@ export async function POST(request: NextRequest) {
 
     const data = await response.json();
 
-    // Firecrawl v2/map returns data.links as string[]
-    // or data.data.links depending on response format
-    const links: string[] = data?.links || data?.data?.links || [];
+    // Firecrawl v2/map returns links as an array of { url: string, title?: string, description?: string }
+    const rawLinks: Array<{ url: string; title?: string; description?: string }> =
+      data?.links || data?.data?.links || [];
 
-    // Convert links to MappedPage[]
     const baseUrl = new URL(url.trim());
-    const pages: MappedPage[] = links
-      .filter((link: string) => {
+    const pages: MappedPage[] = rawLinks
+      .filter((link) => {
         try {
-          const linkUrl = new URL(link);
-          // Only include same-origin links
-          return linkUrl.hostname === baseUrl.hostname;
+          const linkUrl = new URL(link.url);
+          // Only include same-origin links, exclude sitemap.xml
+          return linkUrl.hostname === baseUrl.hostname && !link.url.endsWith('sitemap.xml') && link.url !== baseUrl.origin + '/undefined';
         } catch {
           return false;
         }
       })
-      .map((link: string) => {
-        const linkUrl = new URL(link);
+      .map((link) => {
+        const linkUrl = new URL(link.url);
         const path = linkUrl.pathname || '/';
         const depth = path === '/' ? 0 : path.split('/').filter(Boolean).length;
-        // Generate a title from the path
-        const title = path === '/'
-          ? '首页'
-          : path.split('/').filter(Boolean).pop() || '页面';
+        // Use the title from Firecrawl if available, otherwise derive from path
+        const title = link.title || (path === '/' ? '首页' : path.split('/').filter(Boolean).pop() || '页面');
         return { path, title, depth };
       });
 
