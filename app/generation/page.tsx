@@ -309,10 +309,31 @@ function AISandboxPage() {
           await createSandbox(true);
         }
         
-        // If we have a URL from the home page, mark for automatic start
-        if (storedUrl && isMounted) {
-          // We'll trigger the generation after the component is fully mounted
-          // and the startGeneration function is defined
+        // Check if multi-page mode is active
+        const mpMode = sessionStorage.getItem('multiPageMode');
+        if (mpMode === 'true' && storedUrl && isMounted) {
+          const mpSelected = sessionStorage.getItem('multiPageSelected');
+          if (mpSelected) {
+            try {
+              const selectedPages = JSON.parse(mpSelected);
+              if (Array.isArray(selectedPages) && selectedPages.length > 0) {
+                // Clear session storage flags to prevent re-triggering
+                sessionStorage.removeItem('multiPageMode');
+                sessionStorage.removeItem('multiPageSelected');
+                sessionStorage.removeItem('multiPageCount');
+                sessionStorage.removeItem('autoStart');
+
+                // Start multi-page generation after a delay for component to settle
+                setTimeout(() => {
+                  startMultiPageGeneration(storedUrl, selectedPages);
+                }, 1000);
+              }
+            } catch (e) {
+              console.error('[generation] Failed to parse multiPageSelected for start:', e);
+            }
+          }
+        } else if (storedUrl && isMounted) {
+          // If we have a URL from the home page (single page), mark for automatic start
           sessionStorage.setItem('autoStart', 'true');
         }
       } catch (error) {
@@ -3306,6 +3327,231 @@ Focus on the key sections and content, making it clean and modern.`;
         }));
       }
     }, 500);
+  };
+
+  const startMultiPageGeneration = async (targetUrl: string, pages: Array<{path: string; title: string; depth: number}>) => {
+    if (!targetUrl || !pages || pages.length === 0) return;
+
+    setHomeScreenFading(false);
+    setShowHomeScreen(false);
+    setIsStartingNewGeneration(true);
+    setLoadingStage('gathering');
+    setActiveTab('preview');
+    setShowLoadingBackground(true);
+
+    // Ensure URL has protocol
+    let url = targetUrl.trim();
+    if (!url.match(/^https?:\/\//i)) {
+      url = 'https://' + url;
+    }
+    const cleanUrl = url.replace(/^https?:\/\//i, '');
+
+    addChatMessage(`Starting multi-page clone (${pages.length} pages)...`, 'system');
+
+    // Ensure sandbox exists
+    const sandboxPromise = !sandboxData ? createSandbox(true) : Promise.resolve(null);
+
+    // Construct full URLs for batch scrape
+    let targetOrigin: string;
+    try {
+      targetOrigin = new URL(url).origin;
+    } catch {
+      addChatMessage('Invalid target URL', 'error');
+      setIsStartingNewGeneration(false);
+      setShowLoadingBackground(false);
+      return;
+    }
+
+    const urls = pages.map((page: any) => {
+      const path = page.path || '';
+      const cleanPath = path.startsWith('/') ? path : '/' + path;
+      return targetOrigin + cleanPath;
+    });
+
+    // Wait for sandbox
+    await sandboxPromise;
+
+    try {
+      // === STEP 1: Batch scrape all pages ===
+      setLoadingStage('gathering');
+      setGenerationProgress(prev => ({
+        ...prev,
+        isGenerating: true,
+        status: `Scraping ${pages.length} pages...`,
+        components: [],
+        currentComponent: 0,
+        streamedCode: '',
+        isStreaming: false,
+        isThinking: false,
+        files: prev.files || [],
+        currentFile: undefined,
+        lastProcessedPosition: 0
+      }));
+
+      const scrapeResponse = await fetch('/api/batch-scrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ urls })
+      });
+
+      if (!scrapeResponse.ok || !scrapeResponse.body) {
+        throw new Error('Failed to start batch scrape');
+      }
+
+      const scrapeReader = scrapeResponse.body.getReader();
+      const scrapeDecoder = new TextDecoder();
+      const scrapedPages: Array<{ url: string; title: string; content: string; screenshot: string | null }> = [];
+      let scrapeComplete = false;
+
+      while (true) {
+        const { done, value } = await scrapeReader.read();
+        if (done) break;
+
+        const chunk = scrapeDecoder.decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+
+              if (data.type === 'page-start') {
+                setGenerationProgress(prev => ({
+                  ...prev,
+                  status: `Scraping page ${data.index + 1} of ${data.total}: ${data.url}`
+                }));
+              } else if (data.type === 'page-done') {
+                scrapedPages.push({
+                  url: data.url,
+                  title: data.title,
+                  content: data.content,
+                  screenshot: data.screenshot || null
+                });
+                setGenerationProgress(prev => ({
+                  ...prev,
+                  status: `Scraped ${scrapedPages.length} / ${pages.length} pages`
+                }));
+              } else if (data.type === 'page-error') {
+                console.error(`[multi-page] Failed to scrape ${data.url}: ${data.error}`);
+              } else if (data.type === 'complete') {
+                scrapeComplete = true;
+              }
+            } catch (e) {
+              console.error('[multi-page] Failed to parse batch scrape SSE data:', e);
+            }
+          }
+        }
+      }
+
+      if (scrapedPages.length === 0) {
+        throw new Error('Failed to scrape any pages');
+      }
+
+      addChatMessage(`Successfully scraped ${scrapedPages.length} pages for multi-page clone`, 'system');
+
+      // === STEP 2: Generate multi-page code ===
+      setLoadingStage('generating');
+      setActiveTab('generation');
+      setGenerationProgress(prev => ({
+        ...prev,
+        status: 'Generating multi-page application...',
+        isStreaming: true
+      }));
+
+      const generateResponse = await fetch('/api/generate-multi-page', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pages: scrapedPages.map(p => ({
+            url: p.url,
+            title: p.title,
+            content: p.content,
+            screenshot: p.screenshot
+          })),
+          model: aiModel
+        })
+      });
+
+      if (!generateResponse.ok || !generateResponse.body) {
+        throw new Error('Failed to generate multi-page code');
+      }
+
+      const generateReader = generateResponse.body.getReader();
+      const generateDecoder = new TextDecoder();
+      let generatedCode = '';
+
+      while (true) {
+        const { done, value } = await generateReader.read();
+        if (done) break;
+
+        const chunk = generateDecoder.decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+
+              if (data.type === 'status') {
+                setGenerationProgress(prev => ({
+                  ...prev,
+                  status: data.message
+                }));
+              } else if (data.type === 'stream' && data.text) {
+                generatedCode += data.text;
+                setGenerationProgress(prev => ({
+                  ...prev,
+                  isStreaming: true,
+                  status: 'Receiving generated code...'
+                }));
+              } else if (data.type === 'complete') {
+                if (data.generatedCode) {
+                  generatedCode = data.generatedCode;
+                }
+              }
+            } catch (e) {
+              console.error('[multi-page] Failed to parse generate SSE data:', e);
+            }
+          }
+        }
+      }
+
+      // === STEP 3: Apply the generated code ===
+      if (generatedCode) {
+        setGenerationProgress(prev => ({
+          ...prev,
+          isGenerating: false,
+          isStreaming: false,
+          status: 'Multi-page clone complete!'
+        }));
+
+        addChatMessage('Multi-page website generated!', 'system');
+        setPromptInput(generatedCode);
+
+        await applyGeneratedCode(generatedCode, false);
+
+        addChatMessage(
+          `Successfully generated a multi-page clone of ${cleanUrl} with ${scrapedPages.length} pages!`,
+          'ai',
+          { generatedCode }
+        );
+      } else {
+        throw new Error('No code was generated');
+      }
+    } catch (error: any) {
+      console.error('[multi-page] Generation failed:', error);
+      addChatMessage(`Multi-page generation failed: ${error.message}`, 'error');
+      setGenerationProgress(prev => ({
+        ...prev,
+        isGenerating: false,
+        isStreaming: false,
+        status: 'Generation failed'
+      }));
+    } finally {
+      setIsStartingNewGeneration(false);
+      setLoadingStage(null);
+      setShowLoadingBackground(false);
+    }
   };
 
   return (
